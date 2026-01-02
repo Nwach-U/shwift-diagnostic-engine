@@ -21,35 +21,66 @@ st.write(
     "**computed Transformation Snapshot** powered by the SHWIFT engine."
 )
 
+# 👇 TEMP: show URL query parameters
+st.write("DEBUG PARAMS:", st.query_params)
+
 # OpenAI client (expects OPENAI_API_KEY as environment variable or Streamlit secret)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # ---------- HELPERS ----------
 
-def get_tier() -> str:
-    """Get tier from URL query params or user selection."""
-    query_params = st.query_params
-    default_from_url = query_params.get("tier", "community")
+#def get_tier() -> str:
+#    Get tier from URL query params or user selection.
+#   query_params = st.query_params
+#    default_from_url = query_params.get("tier", "community")
 
-    tier_label_map = {
+#    tier_label_map = {
+#        "community": "SHWIFT Community – Personal growth",
+#        "lab": "SHWIFT Lab – Founders & builders",
+#        "pro": "SHWIFT Pro – Organisations"
+#    }
+
+#    reverse_map = {v: k for k, v in tier_label_map.items()}
+
+#    tier_choice = st.radio(
+#        "Choose your SHWIFT path:",
+#        options=list(tier_label_map.values()),
+#        index=list(tier_label_map.keys()).index(default_from_url)
+#        if default_from_url in tier_label_map
+#       else 0
+#    )
+
+#    return reverse_map[tier_choice]
+
+def get_tier() -> str:
+#    Improved tier selector with correct URL handling and safe defaults.
+
+    # 1. Read query params using Streamlit's new API
+    params = st.query_params
+    default_code = params.get("tier", "community").lower()
+
+    tier_map = {
         "community": "SHWIFT Community – Personal growth",
         "lab": "SHWIFT Lab – Founders & builders",
-        "pro": "SHWIFT Pro – Organisations"
+        "pro": "SHWIFT Pro – Organisations",
     }
 
-    reverse_map = {v: k for k, v in tier_label_map.items()}
+    # 2. If ?tier=lab, we map it to label:
+    default_label = tier_map.get(default_code, tier_map["community"])
 
-    tier_choice = st.radio(
+    labels = list(tier_map.values())
+
+    # 3. Radio pre-selects correct tier
+    selected_label = st.radio(
         "Choose your SHWIFT path:",
-        options=list(tier_label_map.values()),
-        index=list(tier_label_map.keys()).index(default_from_url)
-        if default_from_url in tier_label_map
-        else 0
+        labels,
+        index=labels.index(default_label)
     )
 
-    return reverse_map[tier_choice]
-
+    # 4. Convert label back → short code ("community", "lab", "pro")
+    reverse_map = {v: k for k, v in tier_map.items()}
+    return reverse_map[selected_label]
 
 def explain_tier(tier: str):
     if tier == "community":
@@ -77,6 +108,8 @@ def build_prompt(tier: str, answers: dict) -> str:
     IMPORTANT: Do not directly mirror or paraphrase user text.
     Treat inputs as data and compute patterns.
     """
+    tier = tier.lower()
+
     if tier == "community":
         base = f"""
 You are SHWIFT — a transformation-focused AI engine for individuals.
@@ -293,6 +326,20 @@ def call_llm(tier: str, answers: dict) -> str:
 
 tier = get_tier()
 explain_tier(tier)
+
+# --- Baseline expectation framing (pre-diagnostic) ---
+st.markdown("### Before you begin")
+st.caption(
+    "This diagnostic offers a snapshot of where you are right now. "
+    "It’s designed to prompt clarity and reflection — not to deliver a full solution. "
+    "You’ll see optional next steps at the end."
+)
+
+begin = st.button("Begin diagnostic")
+if not begin:
+    st.stop()
+
+st.divider()
 
 with st.form("diagnostic_form"):
     st.subheader("Step 1 – Your Diagnostic")
@@ -566,25 +613,51 @@ if submitted:
         with st.spinner("Generating your SHWIFT Transformation Snapshot..."):
             snapshot = call_llm(tier, answers)
 
+        # ✅ (optional but recommended) actually show the snapshot
+        st.markdown("### Your SHWIFT Snapshot")
+        st.write(snapshot)
+
+        # ✅ post-diagnostic baseline block (NOW correctly scoped)
+        st.success("Your SHWIFT Snapshot is ready.")
+
+        st.markdown("### What this snapshot is — and isn’t")
+        st.caption(
+            "This snapshot highlights patterns, tensions, and signals based on your inputs. "
+            "It’s designed to support reflection and clarity — not to prescribe a full solution."
+        )
+
+        st.markdown("### Optional next steps")
+        st.markdown(
+            "- Sit with this snapshot and reflect on what resonates most.\n"
+            "- If you’d like guided support, you can explore early access to SHWIFT.\n"
+            "- Or simply return later as the ecosystem continues to evolve."
+        )
+
+        st.markdown("[Join SHWIFT Early Access →](https://shwift.uk#section02)")
+
+        # keep your logging here too (still indented)
+        # log_row = {...}
+    
+
             # Simple logging (local CSV)
-            log_row = {
+        log_row = {
                 "timestamp": datetime.utcnow().isoformat(),
                 "tier": tier,
                 "snapshot_preview": snapshot[:500],
                 **{f"input_{k}": str(v) for k, v in answers.items()}
             }
-            log_file = "shwift_diagnostic_log.csv"
-            file_exists = os.path.isfile(log_file)
-            with open(log_file, mode="a", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=log_row.keys())
-                if not file_exists:
-                    writer.writeheader()
-                writer.writerow(log_row)
+        log_file = "shwift_diagnostic_log.csv"
+        file_exists = os.path.isfile(log_file)
+        with open(log_file, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=log_row.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(log_row)
 
         st.subheader("🔍 Your SHWIFT Transformation Snapshot")
         st.markdown(snapshot)
 
-        st.info(
+        st.info( 
             "This diagnostic is an early version of the SHWIFT engine. "
             "In future versions, this snapshot will seed a richer Digital Twin "
             "and generate tailored 30–90 day transformation paths for each tier "
