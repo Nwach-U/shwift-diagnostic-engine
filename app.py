@@ -22,7 +22,7 @@ st.write(
 )
 
 # 👇 TEMP: show URL query parameters
-st.write("DEBUG PARAMS:", st.query_params)
+# st.write("DEBUG PARAMS:", st.query_params)
 
 # OpenAI client (expects OPENAI_API_KEY as environment variable or Streamlit secret)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -335,8 +335,13 @@ st.caption(
     "You’ll see optional next steps at the end."
 )
 
-begin = st.button("Begin diagnostic")
-if not begin:
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+if st.button("Begin diagnostic"):
+    st.session_state.started = True
+
+if not st.session_state.started:
     st.stop()
 
 st.divider()
@@ -653,13 +658,3 @@ if submitted:
             if not file_exists:
                 writer.writeheader()
             writer.writerow(log_row)
-
-        st.subheader("🔍 Your SHWIFT Transformation Snapshot")
-        st.markdown(snapshot)
-
-        st.info( 
-            "This diagnostic is an early version of the SHWIFT engine. "
-            "In future versions, this snapshot will seed a richer Digital Twin "
-            "and generate tailored 30–90 day transformation paths for each tier "
-            "(Community, Lab, and Pro)."
-        )
